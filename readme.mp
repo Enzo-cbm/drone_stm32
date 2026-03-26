@@ -15,7 +15,7 @@ Objectif : vol stabilisé robuste puis extension vers navigation (capteurs exter
 
 -------------------------------------------------------------------------------
 
-## Roadmap capteurs (prévu)
+## Roadmap capteurs 
 Ajouts prévus pour améliorer la stabilisation et préparer des modes “assistés” :
 - Baromètre (altitude / maintien d’altitude)
 - LiDAR (distance sol / anti-collision / altitude proche sol)
@@ -37,27 +37,24 @@ IMU -> I2C DMA -> HAL_I2C_MemRxCpltCallback -> notify task -> MPU_ProcessLatest(
 
 -------------------------------------------------------------------------------
 
-## Organisation du dépôt (proposée)
+## Organisation du dépôt 
 
 
 
 drone-stm32/
 │
 ├── Core/
-│   ├── Inc/
-│   │   ├── imu.h
-│   │   ├── radio.h
-│   │   └── timebase.h
-│   │
-│   └── Src/
-│       ├── imu.c
-│       └── radio.c
-│
-├── docs/
-│   └── wiring.md
-│
-├── assets/
-│   └── (à ajouter)
+|   ├── Drivers/
+│   |   ├── Inc/
+│   │   |   ├── imu.h
+│   │   |   ├── radio.h
+│   │   |   └── timebase.h
+│   │   |
+│   |   └── Src/
+│   |       ├── imu.c
+│   |       └── radio.c
+|   |
+│   └── will arrive soon
 │
 └── README.md
 
@@ -86,10 +83,6 @@ Points clés :
   - accumulation sur calib_target = 2000 échantillons
   - correction accel Z : imu.accel_offset[z] -= 1/accel_scale
 
-Remarques (qualité/robustesse) :
-- Ajouter un test WHO_AM_I au boot (prévu dans le header).
-- Prévoir une gestion d’erreur init I²C (LED / statut global).
-- Idée future : double-buffer (snapshot stable) si plusieurs tâches consomment imu.
 
 ### 2) Radio — Capture PWM RC par timer (radio.h / radio.c)
 Objectif :
@@ -121,11 +114,6 @@ API :
 - radio_link_ok()
 - RTOS : radioRtos_bind_task(TaskHandle_t)
 
-À corriger / à ajouter :
-- pulses.last_update_us = timebase_now_us_isr(); -> à implémenter dans timebase (fonction ISR-safe).
-- Dans radio_update(), besoin de timebase_now_us() fonctionnelle.
-- timeout_us dans cfg_radio : doit être cohérent avec la fréquence RC.
-- Vérifier min/max pulse : ton code compare width < min-200 et > max+500, OK mais à calibrer.
 
 ### 3) Timebase — base temps en microsecondes (timebase.h)
 Objectif :
@@ -137,14 +125,11 @@ API prévue :
 - timebase_now_us()
 - timebase_dt_s(uint32_t *last_us)
 
-À ajouter (recommandé) :
-- timebase_now_us_isr() : version utilisable en interruption (sans appel bloquant).
-- préciser l’implémentation (timer dédié ou DWT cycle counter selon STM32F4).
 
 -------------------------------------------------------------------------------
 
 ## Câblage minimal (actuel)
-(à ajouter)
+
 
 - IMU MPU6050 :
   - I²C (hi2c1) : SDA/SCL selon ton board + pullups si besoin
@@ -161,7 +146,6 @@ API prévue :
 - DMA activé pour I²C (lecture MPU6050)
 - TIM1 configuré en input capture (4 canaux)
 
-(à ajouter) : version MCU exacte, board, fréquence, config CubeMX.
 
 -------------------------------------------------------------------------------
 
@@ -184,7 +168,7 @@ API prévue :
 -------------------------------------------------------------------------------
 
 ## Licence
-(à ajouter)
+MIT
 
 ## Contact
-Enzo Coranson-Beaudu — (à ajouter)
+Enzo Coranson-Beaudu — enzomarcuscb@gmail.com
