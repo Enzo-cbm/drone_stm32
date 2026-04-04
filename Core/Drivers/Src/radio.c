@@ -144,7 +144,7 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
 		case HAL_TIM_ACTIVE_CHANNEL_2 : ch = ch2; tim_channel = TIM_CHANNEL_2; break;
 		case HAL_TIM_ACTIVE_CHANNEL_3 : ch = ch3; tim_channel = TIM_CHANNEL_3; break;
 		case HAL_TIM_ACTIVE_CHANNEL_4 : ch = ch4; tim_channel = TIM_CHANNEL_4; break;
-		default; return;
+		default: return;
 	}
 
 	uint32_t tick_max = __HAL_TIM_GET_AUTORELOAD(htim); //nombre de tick du timer ici 65535
@@ -201,10 +201,10 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
 
 			agg_mask |= (1U <<ch);
 
-			if((agg_mask & expected_mask) == expected_mask){                              //publication/notification
+			if((agg_mask & expected_mask) == expected_mask){        //dangereux si un canal se debranche                      //publication/notification
 
 				pulses.frame_counter++;
-				pulses.last_update_us = timebase_now_us_isr();  //iA coder !!!!!!!
+				pulses.last_update_us = timebase_now_us();
 				pulses.valid_mask = agg_mask; //publie
 				agg_mask = 0U; //reset agregation
 
