@@ -204,7 +204,7 @@ static inline float clamp(float val, const float limit){
  * borner ou faire fuire Ki.(S e.dt)                                       ok
  * meilleur test pour l accel : if (accel_norm > min && accel_norm < max)  ok
  * magneto pour le yaw
- * low pass en amont sur ll accel
+ * low pass en amont sur ll accel                                          ok
  */
 
 //dans attidue_init definir la premier last_us
