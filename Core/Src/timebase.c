@@ -14,6 +14,8 @@ void timebase_init(void){
 
 }
 
+
+
 uint32_t timebase_now_us(void){
 
 	return __HAL_TIM_GET_COUNTER(&htim2);
