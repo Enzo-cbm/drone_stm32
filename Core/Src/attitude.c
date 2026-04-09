@@ -23,25 +23,33 @@ static const float DEG_TO_RAD = 0.01745329f;
 
 static const struct {
 
-	float kp;
+	float kp_fort;
+	float kp_moyen;
+	float kp_faible;
 	float ki;
-	float correction_accel;
+	//float correction_accel;
 
 } pid_gain_mahonny = {
-	.kp = 2.0f,
+	.kp_fort = 2.0f,
+	.kp_moyen = 0.8f,
+	.kp_faible = 0.0f,
 	.ki = 0.005f,
-	.correction_accel = 0.05f,
+	//.correction_accel = 0.05f,
 };
 
-static struct {
+static struct {   //correction integrale
 
 	float integralFBx;
 	float integralFBy;
 	float integralFBz;
+	float leak;
+	float limit;
 } err_integrale_mahonny = {
 		.integralFBx = 0.0f,
 		.integralFBy = 0.0f,
 		.integralFBz = 0.0f,
+		.leak = 0.9995f,
+		.limit = 0.2f,
 };
 
 
@@ -104,6 +112,12 @@ static inline quaternion_t quat_multiply (const quaternion_t *a, const quaternio
 
 }
 
+
+
+
+
+
+
 // !!!!!!!!!!!!!! initialiser last_valid_quat dans attitude_init !!!!!!!!!!!!!!!!!!!!!!!!
 //amelioration : utiliser fast invert sqrt
 static inline quaternion_t quat_normalize(const quaternion_t *q, quaternion_t *last_valid_quat) {
@@ -130,6 +144,13 @@ static inline quaternion_t quat_normalize(const quaternion_t *q, quaternion_t *l
 
 }
 
+
+
+
+
+
+
+
 static void get_euler_angles_from_quaternion(void){
 
 	attitude.euler_angle[euler_roll] = atan2f(2.0f*(attitude.quat.quat_w * attitude.quat.quat_x + attitude.quat.quat_y * attitude.quat.quat_z), 1.0f - 2.0f*(attitude.quat.quat_x * attitude.quat.quat_x + attitude.quat.quat_y * attitude.quat.quat_y))*RAD_TO_DEG;
@@ -144,11 +165,23 @@ static void get_euler_angles_from_quaternion(void){
 
 }
 
+
+
+
+
+
+
+static inline float clamp(float val, const float limit){
+	if (val > limit) {return limit;}
+	if (val < -limit) {return -limit;}
+	return val;
+}
+
 /*amelioration :
- * correction plus forte si a ~1g sinon moins forte
- * borner ou faire fuire Ki.(S e.dt)
- * continuer au gyro si accel invalide
- * meilleur test pour l accel : if (accel_norm > min && accel_norm < max)
+ * correction plus forte si a ~1g sinon moins forte                        ok
+ * continuer au gyro si accel invalide                                     ok
+ * borner ou faire fuire Ki.(S e.dt)                                       ok
+ * meilleur test pour l accel : if (accel_norm > min && accel_norm < max)  ok
  * magneto pour le yaw
  * low pass en amont sur ll accel
  */
@@ -165,16 +198,9 @@ static void mahony_update(){
 	float accel_norm = sqrtf(imu_sample.accel[axis_x]*imu_sample.accel[axis_x] + imu_sample.accel[axis_y]*imu_sample.accel[axis_y] + imu_sample.accel[axis_z]*imu_sample.accel[axis_z]);
 	validation.norme_accel = accel_norm;
 
-	if (accel_norm < 1e-6f) {  //utiliser une meilleur protection
-	    return;
-	}
-
-	float accel_inv_norm = 1.0f/accel_norm;
 
 
-	imu_sample.accel[axis_x] *= accel_inv_norm;
-	imu_sample.accel[axis_y] *= accel_inv_norm;
-	imu_sample.accel[axis_z] *= accel_inv_norm;
+
 
 
 	// estimation de l orientation du vecteur g->
@@ -182,31 +208,63 @@ static void mahony_update(){
 	float gy = 2.0f * (attitude.quat.quat_w * attitude.quat.quat_x + attitude.quat.quat_y * attitude.quat.quat_z);
 	float gz = attitude.quat.quat_w * attitude.quat.quat_w - attitude.quat.quat_x * attitude.quat.quat_x - attitude.quat.quat_y * attitude.quat.quat_y + attitude.quat.quat_z * attitude.quat.quat_z;
 
+	float ex = 0.0f;
+	float ey = 0.0f;
+	float ez = 0.0f;
 
-	//erreur = a.mesure X g
-	float ex = (imu_sample.accel[axis_y] * gz - imu_sample.accel[axis_z] * gy);
-	float ey = (imu_sample.accel[axis_z] * gx - imu_sample.accel[axis_x] * gz);
-	float ez = (imu_sample.accel[axis_x] * gy - imu_sample.accel[axis_y] * gx);
+	float kp = pid_gain_mahonny.kp_faible;
 
 
+
+
+
+	if (accel_norm > 1e-6f)
+	{
+		float accel_error = fabsf(accel_norm - 1.0f);
+		if ( accel_error < 0.1f ) {kp = pid_gain_mahonny.kp_fort;}        //acceleration fiable : |accel_norm - 1| < 0.1 => correctif fort
+		else if ( accel_error < 0.3f ) {kp = pid_gain_mahonny.kp_moyen;}  //acceleration peu fiable : 0.1< |accel_norm - 1| < 0.3 => correctif moyen
+		else {kp = pid_gain_mahonny.kp_faible;} //acceleration non fiable : 0.3< |accel_norm - 1| => correctif nul
+
+		float accel_inv_norm = 1.0f/accel_norm;
+
+
+		imu_sample.accel[axis_x] *= accel_inv_norm;
+		imu_sample.accel[axis_y] *= accel_inv_norm;
+		imu_sample.accel[axis_z] *= accel_inv_norm;
+
+		//erreur = a.mesure X g
+		ex = (imu_sample.accel[axis_y] * gz - imu_sample.accel[axis_z] * gy);
+		ey = (imu_sample.accel[axis_z] * gx - imu_sample.accel[axis_x] * gz);
+		ez = (imu_sample.accel[axis_x] * gy - imu_sample.accel[axis_y] * gx);
+
+
+	}
+
+	//integrale :(S e.dt) on ajoute un leak de l'integrale et une borne large
+
+	err_integrale_mahonny.integralFBx *= err_integrale_mahonny.leak;  //leak
+	err_integrale_mahonny.integralFBy *= err_integrale_mahonny.leak;
+	err_integrale_mahonny.integralFBz *= err_integrale_mahonny.leak;
+
+
+	err_integrale_mahonny.integralFBx += pid_gain_mahonny.ki * dt * ex;  //integrale
+	err_integrale_mahonny.integralFBy += pid_gain_mahonny.ki * dt * ey;
+	err_integrale_mahonny.integralFBz += pid_gain_mahonny.ki * dt * ez;
+
+	err_integrale_mahonny.integralFBx = clamp(err_integrale_mahonny.integralFBx, err_integrale_mahonny.limit); //borne
+	err_integrale_mahonny.integralFBy = clamp(err_integrale_mahonny.integralFBy, err_integrale_mahonny.limit);
+	err_integrale_mahonny.integralFBz = clamp(err_integrale_mahonny.integralFBz, err_integrale_mahonny.limit);
 
 
 	//PI du gyro  w.corr = w + Kp.e + Ki.(S e.dt)
 
-
-	//integrale :(S e.dt)
-	err_integrale_mahonny.integralFBx += pid_gain_mahonny.ki * dt * ex;
-	err_integrale_mahonny.integralFBy += pid_gain_mahonny.ki * dt * ey;
-	err_integrale_mahonny.integralFBz += pid_gain_mahonny.ki * dt * ez;   //faire un blocage ou un leak de l integrale pour eviter un windup
-
-
 	//corection gyro
-	imu_sample.gyro[axis_x] += pid_gain_mahonny.kp * ex + err_integrale_mahonny.integralFBx;
-	imu_sample.gyro[axis_y] += pid_gain_mahonny.kp * ey + err_integrale_mahonny.integralFBy;
-	imu_sample.gyro[axis_z] += pid_gain_mahonny.kp * ez + err_integrale_mahonny.integralFBz;
+	imu_sample.gyro[axis_x] += kp * ex + err_integrale_mahonny.integralFBx;
+	imu_sample.gyro[axis_y] += kp * ey + err_integrale_mahonny.integralFBy;
+	imu_sample.gyro[axis_z] += kp * ez + err_integrale_mahonny.integralFBz;
+
 
 	//integration quaternion
-
 	quaternion_t omega;
 	omega.quat_w = 0.0f;
 	omega.quat_x = imu_sample.gyro[axis_x] * DEG_TO_RAD;
@@ -239,6 +297,13 @@ static void mahony_update(){
 
 }
 
+
+
+
+
+
+
+
 //verifier les test de validite pour les valeur errone
 bool attitude_is_valid(void){
 
@@ -248,15 +313,15 @@ bool attitude_is_valid(void){
 		return false;
 	}
 
-	else if (fabsf(validation.norme_accel - 1.0f) > 0.5f)
+	/*else if (fabsf(validation.norme_accel - 1.0f) > 0.5f)
 	{
 		return false;
-	}
+	}*/
 	else if (fabsf(validation.norme_quat - 1.0f )> 0.09f)
 	{
 		return false;
 	}
-	else if(fabsf(validation.gyro_temp[axis_x]) > 500.0f || fabsf(validation.gyro_temp[axis_y]) > 500.0f || fabsf(validation.gyro_temp[axis_z]) > 500.0f )
+	else if(fabsf(validation.gyro_temp[axis_x]) > 1000.0f || fabsf(validation.gyro_temp[axis_y]) > 500.0f || fabsf(validation.gyro_temp[axis_z]) > 500.0f )
 	{
 		return false;
 	}
