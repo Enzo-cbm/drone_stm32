@@ -1,7 +1,7 @@
 #include "timebase.h"
 #include "attitude.h"
 #include "imu.h"
-#include<math.h>
+#include <math.h>
 
 
 
@@ -10,12 +10,18 @@
 static attitude_t attitude;
 static is_valid_attitude_t validation;
 
+static bool init_angle_gyro;
+
+static float accel_lissee[axis_count];
 
 
 /////////////////////////////////////////////////convertion////////////////////
 
 static const float RAD_TO_DEG = 57.2957795f;
 static const float DEG_TO_RAD = 0.01745329f;
+
+static const float accel_scale_inv = 1.0f/4096.0f;
+static const float gyro_scale_inv  = 1.0f/65.5f;
 
 
 ///////////////////////////////////////////////coefficiants mahonny///////////////////////////
@@ -79,7 +85,20 @@ void attitude_reset(void){
 
 	last_us_dt = timebase_now_us();
 
+	init_angle_gyro = false;
 
+	for (int i = axis_x; i < axis_count; ++i) {
+	    accel_lissee[i] = 0.0f;
+
+
+	}
+
+	validation.dt = 0.0f;
+	validation.norme_quat = 1.0f;
+
+	for (int i = axis_x; i < axis_count; ++i) {
+	    validation.gyro_temp[i] = 0.0f;
+	}
 
 }
 
@@ -89,8 +108,6 @@ void attitude_reset(void){
 void attitude_init(void){
 
 	attitude_reset();
-
-
 
 }
 
@@ -177,6 +194,10 @@ static inline float clamp(float val, const float limit){
 	return val;
 }
 
+
+
+
+
 /*amelioration :
  * correction plus forte si a ~1g sinon moins forte                        ok
  * continuer au gyro si accel invalide                                     ok
@@ -187,16 +208,15 @@ static inline float clamp(float val, const float limit){
  */
 
 //dans attidue_init definir la premier last_us
-static void mahony_update(){
+static void get_angle_mahony_filter(imu_sample_t *imu_sample){
 
-	imu_sample_t imu_sample = *MPU_GetSample();
 
 	float dt = timebase_dt_s(&last_us_dt);
 	validation.dt = dt;
 
 	//normalisation de l acceleration a-> = g-> + a.lineaire->
-	float accel_norm = sqrtf(imu_sample.accel[axis_x]*imu_sample.accel[axis_x] + imu_sample.accel[axis_y]*imu_sample.accel[axis_y] + imu_sample.accel[axis_z]*imu_sample.accel[axis_z]);
-	validation.norme_accel = accel_norm;
+	float accel_norm = sqrtf(imu_sample->accel[axis_x]*imu_sample->accel[axis_x] + imu_sample->accel[axis_y]*imu_sample->accel[axis_y] + imu_sample->accel[axis_z]*imu_sample->accel[axis_z]);
+
 
 
 
@@ -228,14 +248,14 @@ static void mahony_update(){
 		float accel_inv_norm = 1.0f/accel_norm;
 
 
-		imu_sample.accel[axis_x] *= accel_inv_norm;
-		imu_sample.accel[axis_y] *= accel_inv_norm;
-		imu_sample.accel[axis_z] *= accel_inv_norm;
+		imu_sample->accel[axis_x] *= accel_inv_norm;
+		imu_sample->accel[axis_y] *= accel_inv_norm;
+		imu_sample->accel[axis_z] *= accel_inv_norm;
 
 		//erreur = a.mesure X g
-		ex = (imu_sample.accel[axis_y] * gz - imu_sample.accel[axis_z] * gy);
-		ey = (imu_sample.accel[axis_z] * gx - imu_sample.accel[axis_x] * gz);
-		ez = (imu_sample.accel[axis_x] * gy - imu_sample.accel[axis_y] * gx);
+		ex = (imu_sample->accel[axis_y] * gz - imu_sample->accel[axis_z] * gy);
+		ey = (imu_sample->accel[axis_z] * gx - imu_sample->accel[axis_x] * gz);
+		ez = (imu_sample->accel[axis_x] * gy - imu_sample->accel[axis_y] * gx);
 
 
 	}
@@ -259,17 +279,17 @@ static void mahony_update(){
 	//PI du gyro  w.corr = w + Kp.e + Ki.(S e.dt)
 
 	//corection gyro
-	imu_sample.gyro[axis_x] += kp * ex + err_integrale_mahonny.integralFBx;
-	imu_sample.gyro[axis_y] += kp * ey + err_integrale_mahonny.integralFBy;
-	imu_sample.gyro[axis_z] += kp * ez + err_integrale_mahonny.integralFBz;
+	imu_sample->gyro[axis_x] += kp * ex + err_integrale_mahonny.integralFBx;
+	imu_sample->gyro[axis_y] += kp * ey + err_integrale_mahonny.integralFBy;
+	imu_sample->gyro[axis_z] += kp * ez + err_integrale_mahonny.integralFBz;
 
 
 	//integration quaternion
 	quaternion_t omega;
 	omega.quat_w = 0.0f;
-	omega.quat_x = imu_sample.gyro[axis_x] * DEG_TO_RAD;
-	omega.quat_y = imu_sample.gyro[axis_y] * DEG_TO_RAD;             //verifier que le gyro est en degre/seconde
-	omega.quat_z = imu_sample.gyro[axis_z] * DEG_TO_RAD;
+	omega.quat_x = imu_sample->gyro[axis_x] * DEG_TO_RAD;
+	omega.quat_y = imu_sample->gyro[axis_y] * DEG_TO_RAD;             //verifier que le gyro est en degre/seconde
+	omega.quat_z = imu_sample->gyro[axis_z] * DEG_TO_RAD;
 
 	quaternion_t quat_dot = quat_multiply(&attitude.quat, &omega); //q˙ = q⊗ω/2
 	quat_dot.quat_w *= 0.5f;
@@ -290,12 +310,109 @@ static void mahony_update(){
 		    attitude.quat.quat_z * attitude.quat.quat_z
 		);
 
-	validation.gyro_temp[axis_x] = imu_sample.gyro[axis_x];
-	validation.gyro_temp[axis_y] = imu_sample.gyro[axis_y];
-	validation.gyro_temp[axis_z] = imu_sample.gyro[axis_z];
+	validation.gyro_temp[axis_x] = imu_sample->gyro[axis_x];
+	validation.gyro_temp[axis_y] = imu_sample->gyro[axis_y];
+	validation.gyro_temp[axis_z] = imu_sample->gyro[axis_z];
 
 
 }
+
+
+
+
+
+
+
+
+
+
+
+//a changer lorsqu il y aura le magneto
+
+
+static void calcul_angle_fusion(void) {
+
+	imu_sample_t imu = *MPU_GetSample();
+
+	for(int i = axis_x ; i < axis_count ; ++i)
+	{
+		imu.accel_raw[i] -= imu.accel_offset[i];
+		imu.gyro_raw[i]  -= imu.gyro_offset[i];
+	}
+
+	//lissage des acceleration et non du gyro (a voir si je le fait plus tard)
+	for(int i = axis_x ; i < axis_count ; ++i)
+		{
+			imu.accel_lisse[i] = accel_lissee[i] * 0.8f + imu.accel_raw[i] * 0.2f ;
+			imu.gyro_lisse[i]  = imu.gyro_raw[i];
+			accel_lissee[i] = imu.accel_lisse[i];
+		}
+
+	//mise a l'echelle
+
+	for(int i = axis_x ; i < axis_count ; ++i)
+		{
+			imu.accel[i] = imu.accel_lisse[i] * accel_scale_inv;
+			imu.gyro[i]  = imu.gyro_lisse[i]  * gyro_scale_inv;
+		}
+
+
+
+	if (!init_angle_gyro) {
+		// Première mesure : initialiser directement avec l'accéléromètre
+		init_angle_gyro = true;
+
+		// On met aussi les angles de sortie pour éviter le saut
+
+		 float roll  = atan2f( imu.accel[axis_y], imu.accel[axis_z]) ;
+		 float pitch = atan2f( -imu.accel[axis_x], sqrtf(imu.accel[axis_y]*imu.accel[axis_y] + imu.accel[axis_z]*imu.accel[axis_z])) ;
+		 float yaw  = 0.0f;  //a changer lorsqu il y aura le magneto
+
+
+		attitude.euler_angle[euler_roll] = roll * RAD_TO_DEG ;
+		attitude.euler_angle[euler_pitch]= pitch  * RAD_TO_DEG ;
+		attitude.euler_angle[euler_yaw]  = yaw * RAD_TO_DEG ;
+
+
+		float cr = cosf(roll * 0.5f);
+		float sr = sinf(roll * 0.5f);
+        float cp = cosf(pitch * 0.5f);
+	    float sp = sinf(pitch * 0.5f);
+	    float cy = cosf(yaw * 0.5f);
+	    float sy = sinf(yaw * 0.5f);
+
+	    attitude.quat.quat_w = cr * cp * cy + sr * sp * sy;
+	    attitude.quat.quat_x = sr * cp * cy - cr * sp * sy;
+	    attitude.quat.quat_y = cr * sp * cy + sr * cp * sy;
+	    attitude.quat.quat_z = cr * cp * sy - sr * sp * cy;
+
+	    attitude.quat = quat_normalize(&attitude.quat, &last_valid_quat);
+	    last_valid_quat = attitude.quat;
+
+	    validation.dt = 0.001f;
+	    validation.norme_quat = 1.0f;
+	    attitude.is_attitude_valid = true;
+
+	    last_us_dt = timebase_now_us();
+
+	    return;
+
+	}
+
+	get_angle_mahony_filter(&imu);
+
+
+}
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -308,20 +425,16 @@ static void mahony_update(){
 bool attitude_is_valid(void){
 
 
-	if(validation.dt > 0.02f || validation.dt < 0.0005f)
+	if(validation.dt > 0.01f || validation.dt < 0.0005f)
 	{
 		return false;
 	}
 
-	/*else if (fabsf(validation.norme_accel - 1.0f) > 0.5f)
-	{
-		return false;
-	}*/
-	else if (fabsf(validation.norme_quat - 1.0f )> 0.09f)
+	else if (fabsf(validation.norme_quat - 1.0f )> 0.01f)
 	{
 		return false;
 	}
-	else if(fabsf(validation.gyro_temp[axis_x]) > 1000.0f || fabsf(validation.gyro_temp[axis_y]) > 500.0f || fabsf(validation.gyro_temp[axis_z]) > 500.0f )
+	else if(fabsf(validation.gyro_temp[axis_x]) > 1000.0f || fabsf(validation.gyro_temp[axis_y]) > 1000.0f || fabsf(validation.gyro_temp[axis_z]) > 1000.0f )
 	{
 		return false;
 	}
@@ -337,7 +450,7 @@ bool attitude_is_valid(void){
 
 void attitude_update(void){
 
-	mahony_update();
+	calcul_angle_fusion();
 
 	attitude.is_attitude_valid = attitude_is_valid();
 
