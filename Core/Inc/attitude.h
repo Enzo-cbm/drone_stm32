@@ -67,23 +67,18 @@ typedef struct {
 
 
 /////////////////////////////////////initialisation et reset ///////////////////////////////////////////
-void attitude_init(void);  //initialise le module : angles, quaternions, filtre
-
-void attitude_reset(void); //reboot
+void attitude_init(attitude_t *att);  //initialise le module : angles, quaternions, filtre
 
 
 
 
 //////////////////////////////////////optention et validation des donnes///////////////////////////////////////
  //reception des donnes imu, correction/conversion, mise a jour de l attitude
-void attitude_update(void);
+void attitude_update(const imu_sample_t *imu, attitude_t *att);
 
 
 bool attitude_is_valid(void);
 
-
-//////////////////////////////////////////getter////////////////////////////////
-const attitude_t* attitude_get(void);
 
 
 
