@@ -10,7 +10,8 @@ Objectif : vol stabilisé robuste puis extension vers navigation (capteurs exter
 - ✅ Module IMU : MPU6050 (I²C + DMA + task notification)
 - ✅ Module Radio : capture PWM RC via TIM1 Input Capture + callback HAL
 - ✅ Base temps : timebase en microsecondes (pour dt, timeouts, etc.)
-- ⏳ Contrôle / moteurs / attitude / PID : (à ajouter)
+- ✅ attitude : estimation de l'orientation spatiale 
+- ⏳ Contrôle / moteurs  / PID : (à ajouter)
 - ⏳ Intégration capteurs : (à ajouter)
 
 -------------------------------------------------------------------------------
@@ -44,17 +45,23 @@ IMU -> I2C DMA -> HAL_I2C_MemRxCpltCallback -> notify task -> MPU_ProcessLatest(
 drone-stm32/
 │
 ├── Core/
-|   ├── Drivers/
-│   |   ├── Inc/
-│   │   |   ├── imu.h
-│   │   |   ├── radio.h
-│   │   |   └── timebase.h
-│   │   |
-│   |   └── Src/
-│   |       ├── imu.c
-│   |       └── radio.c
-|   |
-│   └── will arrive soon
+|    │
+│    ├── Inc/
+│    |   ├── imu.h
+│    |   ├── radio.h
+|    |   ├── attitude.h
+|    |   ├── set_point.h
+│    |   └── timebase.h
+│    |
+│    ├──Src/
+│    |     ├── imu.c
+|    |     ├── radio.c
+|    |     ├── attitude.h
+|    |     ├── set_point.h
+│    |     └── timebase.c
+|    |
+│    |
+|    └── Driver
 │
 └── README.md
 
