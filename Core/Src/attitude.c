@@ -7,7 +7,6 @@
 
 
 
-static attitude_t attitude;
 static is_valid_attitude_t validation;
 
 static bool init_angle_gyro;
@@ -64,20 +63,20 @@ static  quaternion_t last_valid_quat;
 
 
 
-void attitude_reset(void){
+static void attitude_reset(attitude_t *att){
 
-	attitude.quat.quat_w = 1.0f;
-	attitude.quat.quat_x = 0.0f;
-	attitude.quat.quat_y = 0.0f;
-	attitude.quat.quat_z = 0.0f;
+	att->quat.quat_w = 1.0f;
+	att->quat.quat_x = 0.0f;
+	att->quat.quat_y = 0.0f;
+	att->quat.quat_z = 0.0f;
 
-	last_valid_quat = attitude.quat;
+	last_valid_quat = att->quat;
 
-	attitude.is_attitude_valid = true;
+	att->is_attitude_valid = true;
 
-	attitude.euler_angle[euler_roll] = 0.0f;
-	attitude.euler_angle[euler_pitch] = 0.0f;
-	attitude.euler_angle[euler_yaw] = 0.0f;
+	att->euler_angle[euler_roll] = 0.0f;
+	att->euler_angle[euler_pitch] = 0.0f;
+	att->euler_angle[euler_yaw] = 0.0f;
 
 	err_integrale_mahonny.integralFBx = 0.0f;
 	err_integrale_mahonny.integralFBy = 0.0f;
@@ -105,9 +104,9 @@ void attitude_reset(void){
 
 
 
-void attitude_init(void){
+void attitude_init(attitude_t *att){
 
-	attitude_reset();
+	attitude_reset(att);
 
 }
 
@@ -168,17 +167,17 @@ static inline quaternion_t quat_normalize(const quaternion_t *q, quaternion_t *l
 
 
 
-static void get_euler_angles_from_quaternion(void){
+static void get_euler_angles_from_quaternion(attitude_t *att){
 
-	attitude.euler_angle[euler_roll] = atan2f(2.0f*(attitude.quat.quat_w * attitude.quat.quat_x + attitude.quat.quat_y * attitude.quat.quat_z), 1.0f - 2.0f*(attitude.quat.quat_x * attitude.quat.quat_x + attitude.quat.quat_y * attitude.quat.quat_y))*RAD_TO_DEG;
-	float s = 2.0f * (attitude.quat.quat_w * attitude.quat.quat_y - attitude.quat.quat_z * attitude.quat.quat_x);
+	att->euler_angle[euler_roll] = atan2f(2.0f*(att->quat.quat_w * att->quat.quat_x + att->quat.quat_y * att->quat.quat_z), 1.0f - 2.0f*(att->quat.quat_x * att->quat.quat_x + att->quat.quat_y * att->quat.quat_y))*RAD_TO_DEG;
+	float s = 2.0f * (att->quat.quat_w * att->quat.quat_y - att->quat.quat_z * att->quat.quat_x);
 
 	if(s > 1.0f) {s = 1.0f; }
 	if(s < -1.0f) { s = -1.0f; }
 
-	attitude.euler_angle[euler_pitch] = asinf(s) * RAD_TO_DEG;
+	att->euler_angle[euler_pitch] = asinf(s) * RAD_TO_DEG;
 
-	attitude.euler_angle[euler_yaw] = atan2f(2.0f*(attitude.quat.quat_w * attitude.quat.quat_z + attitude.quat.quat_x * attitude.quat.quat_y), 1.0f - 2.0f * (attitude.quat.quat_y * attitude.quat.quat_y + attitude.quat.quat_z * attitude.quat.quat_z)) * RAD_TO_DEG;
+	att->euler_angle[euler_yaw] = atan2f(2.0f*(att->quat.quat_w * att->quat.quat_z + att->quat.quat_x * att->quat.quat_y), 1.0f - 2.0f * (att->quat.quat_y * att->quat.quat_y + att->quat.quat_z * att->quat.quat_z)) * RAD_TO_DEG;
 
 }
 
@@ -208,7 +207,7 @@ static inline float clamp(float val, const float limit){
  */
 
 //dans attidue_init definir la premier last_us
-static void get_angle_mahony_filter(imu_sample_t *imu_sample){
+static void get_angle_mahony_filter(imu_sample_t *imu_sample, attitude_t *att){
 
 
 	float dt = timebase_dt_s(&last_us_dt);
@@ -224,9 +223,9 @@ static void get_angle_mahony_filter(imu_sample_t *imu_sample){
 
 
 	// estimation de l orientation du vecteur g->
-	float gx = 2.0f * (attitude.quat.quat_x * attitude.quat.quat_z - attitude.quat.quat_w * attitude.quat.quat_y);
-	float gy = 2.0f * (attitude.quat.quat_w * attitude.quat.quat_x + attitude.quat.quat_y * attitude.quat.quat_z);
-	float gz = attitude.quat.quat_w * attitude.quat.quat_w - attitude.quat.quat_x * attitude.quat.quat_x - attitude.quat.quat_y * attitude.quat.quat_y + attitude.quat.quat_z * attitude.quat.quat_z;
+	float gx = 2.0f * (att->quat.quat_x * att->quat.quat_z - att->quat.quat_w * att->quat.quat_y);
+	float gy = 2.0f * (att->quat.quat_w * att->quat.quat_x + att->quat.quat_y * att->quat.quat_z);
+	float gz = att->quat.quat_w * att->quat.quat_w - att->quat.quat_x * att->quat.quat_x - att->quat.quat_y * att->quat.quat_y + att->quat.quat_z * att->quat.quat_z;
 
 	float ex = 0.0f;
 	float ey = 0.0f;
@@ -291,23 +290,23 @@ static void get_angle_mahony_filter(imu_sample_t *imu_sample){
 	omega.quat_y = imu_sample->gyro[axis_y] * DEG_TO_RAD;             //verifier que le gyro est en degre/seconde
 	omega.quat_z = imu_sample->gyro[axis_z] * DEG_TO_RAD;
 
-	quaternion_t quat_dot = quat_multiply(&attitude.quat, &omega); //q˙ = q⊗ω/2
+	quaternion_t quat_dot = quat_multiply(&att->quat, &omega); //q˙ = q⊗ω/2
 	quat_dot.quat_w *= 0.5f;
 	quat_dot.quat_x *= 0.5f;
 	quat_dot.quat_y *= 0.5f;
 	quat_dot.quat_z *= 0.5f;
 
-	attitude.quat.quat_w += quat_dot.quat_w * dt;     //q=q+q˙dt
-	attitude.quat.quat_x += quat_dot.quat_x * dt;
-	attitude.quat.quat_y += quat_dot.quat_y * dt;
-	attitude.quat.quat_z += quat_dot.quat_z * dt;
+	att->quat.quat_w += quat_dot.quat_w * dt;     //q=q+q˙dt
+	att->quat.quat_x += quat_dot.quat_x * dt;
+	att->quat.quat_y += quat_dot.quat_y * dt;
+	att->quat.quat_z += quat_dot.quat_z * dt;
 
-	attitude.quat = quat_normalize(&attitude.quat, &last_valid_quat);
+	att->quat = quat_normalize(&att->quat, &last_valid_quat);
 	validation.norme_quat = sqrtf(
-		    attitude.quat.quat_w * attitude.quat.quat_w +
-		    attitude.quat.quat_x * attitude.quat.quat_x +
-		    attitude.quat.quat_y * attitude.quat.quat_y +
-		    attitude.quat.quat_z * attitude.quat.quat_z
+			att->quat.quat_w * att->quat.quat_w +
+			att->quat.quat_x * att->quat.quat_x +
+			att->quat.quat_y * att->quat.quat_y +
+			att->quat.quat_z * att->quat.quat_z
 		);
 
 	validation.gyro_temp[axis_x] = imu_sample->gyro[axis_x];
@@ -330,9 +329,10 @@ static void get_angle_mahony_filter(imu_sample_t *imu_sample){
 //a changer lorsqu il y aura le magneto
 
 
-static void calcul_angle_fusion(void) {
+static void calcul_angle_fusion(const imu_sample_t *imu_in, attitude_t *att) {
 
-	imu_sample_t imu = *MPU_GetSample();
+	imu_sample_t imu = *imu_in; //les mofif ne servent qu'a cette fonction
+
 
 	for(int i = axis_x ; i < axis_count ; ++i)
 	{
@@ -369,9 +369,9 @@ static void calcul_angle_fusion(void) {
 		 float yaw  = 0.0f;  //a changer lorsqu il y aura le magneto
 
 
-		attitude.euler_angle[euler_roll] = roll * RAD_TO_DEG ;
-		attitude.euler_angle[euler_pitch]= pitch  * RAD_TO_DEG ;
-		attitude.euler_angle[euler_yaw]  = yaw * RAD_TO_DEG ;
+		att->euler_angle[euler_roll] = roll * RAD_TO_DEG ;
+		att->euler_angle[euler_pitch]= pitch  * RAD_TO_DEG ;
+		att->euler_angle[euler_yaw]  = yaw * RAD_TO_DEG ;
 
 
 		float cr = cosf(roll * 0.5f);
@@ -381,17 +381,17 @@ static void calcul_angle_fusion(void) {
 	    float cy = cosf(yaw * 0.5f);
 	    float sy = sinf(yaw * 0.5f);
 
-	    attitude.quat.quat_w = cr * cp * cy + sr * sp * sy;
-	    attitude.quat.quat_x = sr * cp * cy - cr * sp * sy;
-	    attitude.quat.quat_y = cr * sp * cy + sr * cp * sy;
-	    attitude.quat.quat_z = cr * cp * sy - sr * sp * cy;
+	    att->quat.quat_w = cr * cp * cy + sr * sp * sy;
+	    att->quat.quat_x = sr * cp * cy - cr * sp * sy;
+	    att->quat.quat_y = cr * sp * cy + sr * cp * sy;
+	    att->quat.quat_z = cr * cp * sy - sr * sp * cy;
 
-	    attitude.quat = quat_normalize(&attitude.quat, &last_valid_quat);
-	    last_valid_quat = attitude.quat;
+	    att->quat = quat_normalize(&att->quat, &last_valid_quat);
+	    last_valid_quat = att->quat;
 
 	    validation.dt = 0.001f;
 	    validation.norme_quat = 1.0f;
-	    attitude.is_attitude_valid = true;
+	    att->is_attitude_valid = true;
 
 	    last_us_dt = timebase_now_us();
 
@@ -399,7 +399,7 @@ static void calcul_angle_fusion(void) {
 
 	}
 
-	get_angle_mahony_filter(&imu);
+	get_angle_mahony_filter(&imu, att);
 
 
 }
@@ -422,7 +422,7 @@ static void calcul_angle_fusion(void) {
 
 
 //verifier les test de validite pour les valeur errone
-bool attitude_is_valid(void){
+bool attitude_is_valid(){
 
 
 	if(validation.dt > 0.01f || validation.dt < 0.0005f)
@@ -448,15 +448,15 @@ bool attitude_is_valid(void){
 
 
 
-void attitude_update(void){
+void attitude_update(const imu_sample_t *imu, attitude_t *att){
 
-	calcul_angle_fusion();
+	calcul_angle_fusion(imu, att);
 
-	attitude.is_attitude_valid = attitude_is_valid();
+	att->is_attitude_valid = attitude_is_valid();
 
-	if(attitude.is_attitude_valid)
+	if(att->is_attitude_valid)
 	{
-		get_euler_angles_from_quaternion();
+		get_euler_angles_from_quaternion(att);
 	}
 }
 
@@ -464,10 +464,6 @@ void attitude_update(void){
 
 
 
-//////////////////////////////////////////getter////////////////////////////////
-const attitude_t* attitude_get(void){
-	return &attitude;
-}
 
 
 
