@@ -6,9 +6,6 @@
 
 
 
-static consigne_t consigne;
-
-
 
 static const struct {
 	float low_lim;
@@ -46,48 +43,48 @@ static inline float map_f(float x, float in_min, float in_max, float out_min, fl
 
 
 
-static void consigne_reset(void){
+static void consigne_reset(consigne_t *consigne, const attitude_t *att){
 
-	memset(&consigne, 0, sizeof(consigne));
-	yaw_target = attitude_get()->euler_angle[euler_yaw];
+	memset(consigne, 0, sizeof(*consigne));
+	yaw_target = att->euler_angle[euler_yaw];
 
 }
 
 
-void consigne_init(void){
-	consigne_reset();
+void consigne_init(consigne_t *consigne, const attitude_t *att){
+	consigne_reset(consigne, att);
 }
 
 
-static void set_point_from_radio_roll_pitch(const radio_raw_t *radio_pulses, const attitude_t *attitude_1){
+static void set_point_from_radio_roll_pitch(consigne_t *consigne, const radio_raw_t *radio_pulses, const attitude_t *att){
 
 	//ROLL
 	if (radio_pulses->pulse_us[ch1] > var_consigne.upper_mid_lim) {
-		consigne.cmd[ROLL] = map_f(radio_pulses->pulse_us[ch1], var_consigne.upper_mid_lim, var_consigne.upper_lim, 0, var_consigne.max_degre_sec);
+		consigne->cmd[ROLL] = map_f(radio_pulses->pulse_us[ch1], var_consigne.upper_mid_lim, var_consigne.upper_lim, 0, var_consigne.max_degre_sec);
 	} else if (radio_pulses->pulse_us[ch1] < var_consigne.down_mid_lim) {
-		consigne.cmd[ROLL] = map_f(radio_pulses->pulse_us[ch1], var_consigne.low_lim, var_consigne.down_mid_lim, var_consigne.min_degre_sec, 0);
+		consigne->cmd[ROLL] = map_f(radio_pulses->pulse_us[ch1], var_consigne.low_lim, var_consigne.down_mid_lim, var_consigne.min_degre_sec, 0);
 	} else {
-		consigne.cmd[ROLL] = 0.0f;
+		consigne->cmd[ROLL] = 0.0f;
 	}
 
 	//PITCH inverse
 	if (radio_pulses->pulse_us[ch2] > var_consigne.upper_mid_lim) {
-			consigne.cmd[PITCH] = map_f(radio_pulses->pulse_us[ch2], var_consigne.upper_mid_lim, var_consigne.upper_lim, 0, var_consigne.min_degre_sec);
+			consigne->cmd[PITCH] = map_f(radio_pulses->pulse_us[ch2], var_consigne.upper_mid_lim, var_consigne.upper_lim, 0, var_consigne.min_degre_sec);
 		} else if (radio_pulses->pulse_us[ch2] < var_consigne.down_mid_lim) {
-			consigne.cmd[PITCH] = map_f(radio_pulses->pulse_us[ch2], var_consigne.low_lim, var_consigne.down_mid_lim, var_consigne.max_degre_sec, 0);
+			consigne->cmd[PITCH] = map_f(radio_pulses->pulse_us[ch2], var_consigne.low_lim, var_consigne.down_mid_lim, var_consigne.max_degre_sec, 0);
 		} else {
-			consigne.cmd[PITCH] = 0.0f;
+			consigne->cmd[PITCH] = 0.0f;
 		}
 
-	consigne.cmd[ROLL]  -= attitude_1->euler_angle[euler_roll] * var_consigne.coef_stab ;
-	consigne.cmd[PITCH] -= attitude_1->euler_angle[euler_pitch] * var_consigne.coef_stab ;    //attention au bornage, a modifier
+	consigne->cmd[ROLL]  -= att->euler_angle[euler_roll] * var_consigne.coef_stab ;
+	consigne->cmd[PITCH] -= att->euler_angle[euler_pitch] * var_consigne.coef_stab ;    //attention au bornage, a modifier
 
 
 }
 
-
+//reinitialiser yaw_target lorsque throttle est bas pour eviter un pic
 //amelioration du hold avec le futur magnetometre
-static void set_point_from_radio_yaw(const radio_raw_t *radio_pulses, const attitude_t *attitude_1){
+static void set_point_from_radio_yaw(consigne_t *consigne, const radio_raw_t *radio_pulses, const attitude_t *attitude_1){
 
 	float cmd_yaw = 0.0f;
 
@@ -111,45 +108,36 @@ static void set_point_from_radio_yaw(const radio_raw_t *radio_pulses, const atti
 			if (yaw_error > 180.0f) {yaw_error -= 360.0f; }
 			if (yaw_error < -180.0f) {yaw_error += 360.0f; }
 
-			consigne.cmd[YAW] = yaw_error * var_consigne.yaw_hold_gain;
+			consigne->cmd[YAW] = yaw_error * var_consigne.yaw_hold_gain;
 
 		} else {
-			consigne.cmd[YAW] = cmd_yaw;
+			consigne->cmd[YAW] = cmd_yaw;
 			yaw_target = attitude_1->euler_angle[euler_yaw];
 		}
 
 	}else {
-		consigne.cmd[YAW] = 0.0f;
+		consigne->cmd[YAW] = 0.0f;
 	}
 
 
 }
 
-static void set_point_from_radio_throttle(const radio_raw_t *radio_pulses) {
+static void set_point_from_radio_throttle(consigne_t *consigne, const radio_raw_t *radio_pulses) {
 
-	consigne.cmd[THROTTLE] = radio_pulses->pulse_us[ch3];
+	consigne->cmd[THROTTLE] = radio_pulses->pulse_us[ch3];
 
-	if (consigne.cmd[THROTTLE] > 1700.0f) { consigne.cmd[THROTTLE] = 1700.0f;}
+	if (consigne->cmd[THROTTLE] > 1700.0f) { consigne->cmd[THROTTLE] = 1700.0f;}
 
 }
 
-void set_point_update_from_radio(void){
+void set_point_update_from_radio(consigne_t *consigne, const radio_raw_t *radio_pulses, const attitude_t *att){
 
-	radio_raw_t radio_pulses;
-	radio_get_raw_snapshot(&radio_pulses);
-
-	const attitude_t *attitude_1 = attitude_get();
-
-
-
-	set_point_from_radio_roll_pitch(&radio_pulses, attitude_1);
-	set_point_from_radio_yaw(&radio_pulses, attitude_1);
-	set_point_from_radio_throttle(&radio_pulses);
+	set_point_from_radio_roll_pitch(consigne, radio_pulses, att);
+	set_point_from_radio_yaw(consigne, radio_pulses, att);
+	set_point_from_radio_throttle(consigne, radio_pulses);
 }
 
-consigne_t consigne_get(void) {
-	return consigne;
-}
+
 
 
 
