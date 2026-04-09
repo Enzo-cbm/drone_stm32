@@ -1,15 +1,20 @@
+#ifndef IMU_H
+#define IMU_H
 
-#ifndef ATTITUDE_H
-#define ATTITUDE_H
 
-#include "imu.h"
-#include "timebase.h"
+#include <stdint.h>
 #include <stdbool.h>
 
 
-/*
- * de imu.h attitude.h peut utiliser les structures suivantes
- *
+
+#include "FreeRTOS.h"
+#include "task.h"
+
+
+
+
+//  FAIRE LE TEST WHO AM I DE L IMU!!!!!!!!!!!!!!!!!!!!
+
 typedef enum {
 
 	euler_roll = 0,
@@ -27,70 +32,86 @@ typedef enum {
 	axis_z,
 	axis_count  //=3
 
-}axis_t;
- *
- */
+}axis_t;                 //index des differant axes sur les quels se deplace le drone
 
 typedef enum {
-	quat_index_w = 0,
-	quat_index_x,
-	quat_index_y,
-	quat_index_z,
-	quat_count,
-}quaternion_index_t;
+
+	calib_not_done = 0,
+	calib_running,
+	calib_done,
+}calibration_t;
+
 
 
 typedef struct {
-	float quat_w;
-	float quat_x;
-	float quat_y;
-	float quat_z;
-}quaternion_t;
 
-typedef struct {
-	quaternion_t quat;
-	float euler_angle[angle_count];
-	bool is_attitude_valid;
+	int16_t accel_raw[axis_count];
+	int16_t gyro_raw[axis_count];
+	int32_t temperature;
 
+	float accel_offset[axis_count];
+	float gyro_offset[axis_count];
 
-} attitude_t;
+	float accel_raw_minus_offset[axis_count];
+	float gyro_raw_minus_offset[axis_count];
 
+	float accel_lisse[axis_count];
+	float gyro_lisse[axis_count];
 
-typedef struct {
-	float dt;
-	float norme_quat;
-	float gyro_temp[axis_count];
-} is_valid_attitude_t;
+	float accel[axis_count];
+	float gyro[axis_count];
+	float angle[angle_count];
 
+	bool calib_end;
 
-
+}imu_sample_t;
 
 
-/////////////////////////////////////initialisation et reset ///////////////////////////////////////////
-void attitude_init(attitude_t *att);  //initialise le module : angles, quaternions, filtre
+/*============== DECLARATIONS DES FONCTIONS ===============*/
 
 
 
-
-//////////////////////////////////////optention et validation des donnes///////////////////////////////////////
- //reception des donnes imu, correction/conversion, mise a jour de l attitude
-void attitude_update(const imu_sample_t *imu, attitude_t *att);
-
-
-bool attitude_is_valid(void);
+void init_MPU(void);                            /*---initialisation mpu----*/
 
 
 
+#ifdef USE_FREERTOS
+
+void MPU_RtosInit( TaskHandle_t taskToNotify); //initialisation du mpu (horloge i2c, temperature, vitesse angulaire accel, filtre
+
+
+#endif
+
+
+/** Lance une lecture non-bloquante (DMA) de 14 octets depuis 0x3B.
+ *  Retourne pdTRUE si le lancement a réussi, sinon pdFALSE (bus busy, mutex timeout, etc.)
+ */
+BaseType_t MPU_StartReadDMA(void);
 
 
 
+/** À appeler dans la tâche IMU après notification (ou périodiquement).
+ *  Parse le buffer reçu et met à jour l’échantillon courant.
+ */
+void MPU_ProcessLatest(void);
 
 
+const imu_sample_t *MPU_GetSample(void);   /** Accès lecture à la dernière mesure stable (double-buffer). */
+
+
+
+void MPU_CalibStart();                     /*calibration imu gestion des offset*/
+
+
+uint8_t MPU_IsCalibrated(void);
 
 
 
 
 #endif
+
+////////////////////////////////////////////
+
 
 
 
