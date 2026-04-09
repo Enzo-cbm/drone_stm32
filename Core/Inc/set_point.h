@@ -15,10 +15,9 @@ typedef struct {
 
 
 
-void consigne_init(void);
+void consigne_init(consigne_t *consigne, const attitude_t *att);
 
-consigne_t consigne_get(void);
-void set_point_update_from_radio(void);
+void set_point_update_from_radio(consigne_t *consigne, const radio_raw_t *radio_pulses, const attitude_t *att);
 
 
 
