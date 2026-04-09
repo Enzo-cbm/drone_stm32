@@ -32,7 +32,7 @@
  */
 
 
-
+//faire le test who am i
 
 
 
@@ -46,9 +46,6 @@
 
 /*============= VARIABLES PRIVEES ================*/
 
-//facteurs de conversion des donnes
-static const float  accel_scale = 1.0f/4096.0f;   //static limite la porte au fichier .c, visible uniquement dans ce fichier, inaccessible aux autres, unique, persistante (garde sa valeur entre 2 appel)
-//static const float gyro_scale = 1.0f/65.5f;
 
 
 #define MPU_ADDR      (0x68 << 1)
@@ -79,6 +76,9 @@ static volatile calibration_t calib = calib_not_done;
 
 static uint16_t calib_target = 2000;
 static uint16_t calib_count = 0;
+
+static const float accel_scale_inv = 1.0f/4096.0f;
+static const float gyro_scale_inv  = 1.0f/65.5f;
 
 
 
@@ -149,6 +149,10 @@ void MPU_RtosInit(TaskHandle_t taskToNotify)
 	task_to_notify  = taskToNotify ;    //mise en memoire de la tache a reveille
 	memset(&imu, 0, sizeof(imu));
 	//met toute la structure imu a 0 : accel_raw, gyro_raw
+
+	imu.calib_end = false;
+
+	in_flight = 0;
 
 	rx_done = 0;
 	//indique qu aucune donne n a ete recu pour l instant
@@ -248,7 +252,33 @@ void MPU_ProcessLatest(void)
 	imu.gyro_raw[axis_z]  *= -1;
 
 	//la calibration est automatiquement faite, et s arrete une fois les 2000 mesures effectuees
-	MPU_CalibrationNewSamples();
+	//mettre un etat calibration ou un ne calcul pas les quaternion ni l'attitude
+	if (!imu.calib_end)
+	{
+		MPU_CalibrationNewSamples();
+	}
+
+	for(int i = axis_x ; i < axis_count ; ++i)
+	{
+		imu.accel_raw_minus_offset[i] = imu.accel_raw[i] - imu.accel_offset[i];
+		imu.gyro_raw_minus_offset[i]  = imu.gyro_raw[i]  -imu.gyro_offset[i];
+	}
+
+	//lissages des valeurs : le filtre comprend 80% de l'ancienne valeur et 20% de la nouvelle valeur
+	//lissage des acceleration et non du gyro (a voir si je le fait plus tard)
+	for(int i = axis_x ; i < axis_count ; ++i)
+	{
+		imu.accel_lisse[i] = imu.accel_lisse[i] * 0.8f + imu.accel_raw_minus_offset[i] * 0.2f ;
+		imu.gyro_lisse[i]  = imu.gyro_raw_minus_offset[i];
+		}
+
+		//mise a l'echelle
+
+	for(int i = axis_x ; i < axis_count ; ++i)
+	{
+		imu.accel[i] = imu.accel_lisse[i] * accel_scale_inv;
+		imu.gyro[i]  = imu.gyro_lisse[i]  * gyro_scale_inv;
+	}
 
 }
 
@@ -271,6 +301,7 @@ void MPU_CalibStart()
 	//initialisation de la calibration
 	calib_count = 0;
 	calib = calib_running;
+	imu.calib_end = false;
 
 
 }
@@ -287,6 +318,7 @@ static void MPU_CalibrationNewSamples(void)
 	{
 
 		calib = calib_done;
+		imu.calib_end = true;
 		return;
 	}
 
@@ -305,8 +337,9 @@ static void MPU_CalibrationNewSamples(void)
 
 	if(calib_count == calib_target)
 	{
-		imu.accel_offset[axis_z] -= 1.0f/accel_scale;
+		imu.accel_offset[axis_z] -= 1.0f/accel_scale_inv;
 		calib = calib_done;
+		imu.calib_end = true;
 	}
 
 
