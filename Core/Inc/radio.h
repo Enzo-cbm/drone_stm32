@@ -36,11 +36,19 @@ typedef enum {
 
 	ch1 = 0,    //roll
 	ch2,        //pitch
-	ch3,        //yaw
-	ch4,        //throttle
+	ch3,        //throttle
+	ch4,        //yaw
 	RC_CH_COUNT      //nb channel
 
 } radio_channel_t;
+
+typedef enum {
+	ROLL = 0,
+	PITCH,
+	THROTTLE,
+	YAW,
+	DEGRE_OF_LIBERTY,
+} radio_effect_t;
 
 
 
