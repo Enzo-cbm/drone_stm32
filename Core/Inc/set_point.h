@@ -3,6 +3,7 @@
 
 #include "radio.h"
 #include "imu.h"
+#include "attitude.h"
 
 
 
