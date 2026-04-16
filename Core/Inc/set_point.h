@@ -9,7 +9,10 @@
 
 
 typedef struct {
-	float cmd[DEGRE_OF_LIBERTY];
+	float stick_norm[angle_count];
+	float rate_sp[angle_count];
+	float angle_sp[angle_count];
+	float cmd_throttle_us;
 
 }consigne_t;
 
