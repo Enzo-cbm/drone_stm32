@@ -346,10 +346,10 @@ static void correctif_pi_teta(const consigne_t *consigne, const attitude_t *att,
 
 	if (dt < 1e-6f || dt > 0.05f)
 	{
-		cons_pid->is_pid_valid = false;
+		cons_pid->is_pi_teta_valid = false;
 		return;
 	}else{
-		cons_pid->is_pid_valid = true;
+		cons_pid->is_pi_teta_valid = true;
 	}
 
 	for(int i = ROLL ; i <= PITCH ; ++i)
@@ -422,7 +422,11 @@ void update_PID_w_teta(const consigne_t *cons, consigne_pid_t *cons_pid, const a
 
 	float dt = timebase_dt_s(&pid.last_us_w);
 
-	if (dt < 1e-6f || dt > 0.05f){return;}          //verifier ;e bornage de dt
+	if (dt < 1e-6f || dt > 0.05f)  //verifier ;e bornage de dt
+	{
+		cons_pid->is_pid_w_valid = false;
+		return;
+	}else {cons_pid->is_pid_w_valid = true; }
 
 	decay_and_relaxation_w(cons);
 
