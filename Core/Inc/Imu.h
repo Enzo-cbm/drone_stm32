@@ -11,7 +11,7 @@
 #include "task.h"
 
 
-const int angle_count = 3;
+#define angle_count = 3;
 
 //  FAIRE LE TEST WHO AM I DE L IMU!!!!!!!!!!!!!!!!!!!!
 
