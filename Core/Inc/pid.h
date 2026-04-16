@@ -6,6 +6,8 @@
 #include "state.h"
 #include "timebase.h"
 
+#include <stdbool.h>
+
 #define angle_rp_count 2
 
 
@@ -17,6 +19,7 @@
 typedef struct {
 
 	float correct_PID_w[angle_count];
+	float is_pid_valid;
 
 
 }consigne_pid_t;
