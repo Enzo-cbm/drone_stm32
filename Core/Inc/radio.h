@@ -42,11 +42,11 @@ typedef enum {
 
 } radio_channel_t;
 
-typedef enum {
+typedef enum {   //INVERSION THROTTLE ET YAW PAR RAPPORT A LA RECEPTION RADIO YAW : CH4  THROTTLE CH3
 	ROLL = 0,
 	PITCH,
-	THROTTLE,
 	YAW,
+	THROTTLE,
 	DEGRE_OF_LIBERTY,
 } radio_effect_t;
 
@@ -69,7 +69,7 @@ typedef struct {
 
 /*snapchot*/
 typedef struct {
-	uint32_t  pulse_us[RC_CH_COUNT];  //dernieres largeur mesuree
+	uint32_t pulse_us[RC_CH_COUNT];  //dernieres largeur mesuree
 	uint32_t valid_mask;               //1 si pulse_us[i] est valide   0b1011 ch 124 valide 3 invalide
 	uint32_t last_update_us;          // timestamp de la derniere publication
 	uint32_t frame_counter;           //incrementer a chhaque publication coherante
