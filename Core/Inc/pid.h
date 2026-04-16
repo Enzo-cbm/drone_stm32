@@ -19,7 +19,8 @@
 typedef struct {
 
 	float correct_PID_w[angle_count];
-	float is_pid_valid;
+	bool is_pi_teta_valid;
+	bool is_pid_w_valid;
 
 
 }consigne_pid_t;
