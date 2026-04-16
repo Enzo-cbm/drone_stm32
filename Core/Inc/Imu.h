@@ -11,7 +11,7 @@
 #include "task.h"
 
 
-#define angle_count = 3;
+enum { angle_count = 3 };
 
 //  FAIRE LE TEST WHO AM I DE L IMU!!!!!!!!!!!!!!!!!!!!
 
