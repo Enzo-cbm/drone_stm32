@@ -70,9 +70,9 @@ static void attitude_reset(attitude_t *att){
 
 	att->is_attitude_valid = true;
 
-	att->euler_angle[euler_roll] = 0.0f;
-	att->euler_angle[euler_pitch] = 0.0f;
-	att->euler_angle[euler_yaw] = 0.0f;
+	att->euler_angle[ROLL] = 0.0f;
+	att->euler_angle[PITCH] = 0.0f;
+	att->euler_angle[YAW] = 0.0f;
 
 	err_integrale_mahonny.integralFBx = 0.0f;
 	err_integrale_mahonny.integralFBy = 0.0f;
@@ -162,15 +162,15 @@ static inline quaternion_t quat_normalize(const quaternion_t *q, quaternion_t *l
 
 static void get_euler_angles_from_quaternion(attitude_t *att){
 
-	att->euler_angle[euler_roll] = atan2f(2.0f*(att->quat.quat_w * att->quat.quat_x + att->quat.quat_y * att->quat.quat_z), 1.0f - 2.0f*(att->quat.quat_x * att->quat.quat_x + att->quat.quat_y * att->quat.quat_y))*RAD_TO_DEG;
+	att->euler_angle[ROLL] = atan2f(2.0f*(att->quat.quat_w * att->quat.quat_x + att->quat.quat_y * att->quat.quat_z), 1.0f - 2.0f*(att->quat.quat_x * att->quat.quat_x + att->quat.quat_y * att->quat.quat_y))*RAD_TO_DEG;
 	float s = 2.0f * (att->quat.quat_w * att->quat.quat_y - att->quat.quat_z * att->quat.quat_x);
 
 	if(s > 1.0f) {s = 1.0f; }
 	if(s < -1.0f) { s = -1.0f; }
 
-	att->euler_angle[euler_pitch] = asinf(s) * RAD_TO_DEG;
+	att->euler_angle[PITCH] = asinf(s) * RAD_TO_DEG;
 
-	att->euler_angle[euler_yaw] = atan2f(2.0f*(att->quat.quat_w * att->quat.quat_z + att->quat.quat_x * att->quat.quat_y), 1.0f - 2.0f * (att->quat.quat_y * att->quat.quat_y + att->quat.quat_z * att->quat.quat_z)) * RAD_TO_DEG;
+	att->euler_angle[PITCH] = atan2f(2.0f*(att->quat.quat_w * att->quat.quat_z + att->quat.quat_x * att->quat.quat_y), 1.0f - 2.0f * (att->quat.quat_y * att->quat.quat_y + att->quat.quat_z * att->quat.quat_z)) * RAD_TO_DEG;
 
 }
 
@@ -196,7 +196,7 @@ static inline float clamp(float val, const float limit){
  * borner ou faire fuire Ki.(S e.dt)                                       ok
  * meilleur test pour l accel : if (accel_norm > min && accel_norm < max)  ok
  * magneto pour le yaw
- * low pass en amont sur ll accel                                          ok
+ * low pass en amont sur ll accel                                          ok  dans imu
  */
 
 //dans attidue_init definir la premier last_us
@@ -338,9 +338,9 @@ static void calcul_angle_fusion(attitude_t *att) {
 		 float yaw  = 0.0f;  //a changer lorsqu il y aura le magneto
 
 
-		att->euler_angle[euler_roll] = roll * RAD_TO_DEG ;
-		att->euler_angle[euler_pitch]= pitch  * RAD_TO_DEG ;
-		att->euler_angle[euler_yaw]  = yaw * RAD_TO_DEG ;
+		att->euler_angle[ROLL] = roll * RAD_TO_DEG ;
+		att->euler_angle[PITCH]= pitch  * RAD_TO_DEG ;
+		att->euler_angle[YAW]  = yaw * RAD_TO_DEG ;
 
 
 		float cr = cosf(roll * 0.5f);
