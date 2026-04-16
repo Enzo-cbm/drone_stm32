@@ -1,5 +1,4 @@
 #include "set_point.h"
-#include "attitude.h"
 
 #include <string.h>
 #include <math.h>
