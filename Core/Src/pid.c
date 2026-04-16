@@ -331,7 +331,7 @@ static void calcul_w_stab_horizon(const consigne_t *cons){
 
 
 
-static void correctif_pi_teta(const consigne_t *consigne, const attitude_t *att){
+static void correctif_pi_teta(const consigne_t *consigne, const attitude_t *att, consigne_pid_t *cons_pid){
 
 	for (int i = ROLL ; i <= PITCH ; ++i){
 
@@ -344,7 +344,13 @@ static void correctif_pi_teta(const consigne_t *consigne, const attitude_t *att)
 
 	float dt = timebase_dt_s(&pid.last_us_teta);
 
-	if (dt < 1e-6f || dt > 0.05f){return;}
+	if (dt < 1e-6f || dt > 0.05f)
+	{
+		cons_pid->is_pid_valid = false;
+		return;
+	}else{
+		cons_pid->is_pid_valid = true;
+	}
 
 	for(int i = ROLL ; i <= PITCH ; ++i)
 	{
@@ -404,7 +410,7 @@ void update_PID_w_teta(const consigne_t *cons, consigne_pid_t *cons_pid, const a
 			pid.erreur_w[i] = cons->rate_sp[i] - att->gyro[i];
 		}
 	}else {
-		correctif_pi_teta(cons, att);
+		correctif_pi_teta(cons, att, cons_pid);
 		calcul_w_stab_horizon(cons);
 
 
@@ -454,4 +460,74 @@ void update_PID_w_teta(const consigne_t *cons, consigne_pid_t *cons_pid, const a
 
 
 
+
+
+
+
+
+
+
+/*
+//attention au bornage, a modifier
+static void correctif_PID_w(const consigne_t *consigne, const attitude_t *att, pid_t *pid) {
+
+	for (int i = euler_roll ; i < angle_count ; ++i)
+	{
+		pid->erreur_w[i] = consigne->rate_sp[i] - att->gyro[i];
+	}
+
+	float dt = timebase_dt_s(&pid->last_us_w);
+
+	if (dt < 1e-6f || dt > 0.05f){return;}
+
+
+
+	decay_and_relaxation_w(consigne, pid);
+
+	for(int i = euler_roll ; i < angle_count ; ++i)
+	{
+		pid->correct_P_w[i] = var_pid.kp_w[i] * pid->erreur_w[i];
+
+
+		pid->erreur_integrale_w[i] += pid->erreur_w[i] * dt;
+		pid->erreur_integrale_w[i]  = clamp(pid->erreur_integrale_w[i] , var_pid.integrale_max_w);
+		pid->correct_I_w[i]         = var_pid.ki_w[i] * pid->erreur_integrale_w[i] ;
+
+
+		pid->erreur_derive_w[i]      = att->gyro[i];
+		pid->correct_D_w[i]          = - var_pid.kd_w[i] * pid->erreur_derive_w[i];
+
+
+		pid->correct_PID_w[i] = pid->correct_P_w[i] + pid->correct_I_w[i] + pid->correct_D_w[i];
+		pid->correct_PID_w[i] = clamp(pid->correct_PID_w[i] , var_pid.max_pid_w);
+
+	}
+
+}
+
+
+
+
+*/
+
+
+
+
+
+/*
+static inline float  alpha_harder(const float stick_position ){
+
+	float a = fabsf(stick_position);
+
+	a = (a - 0.1f)/0.9f; //deadband de 0.1f
+
+	if ( a < 0.0f ) { a = 0.0f; } //<0.1f mode stab
+
+	if ( a > 1.0f ) { a = 1.0f; } //>1.0 mode horizon
+
+	return a * a ; //evolution plus forte de degre 2
+
+}
+
+*/
 
