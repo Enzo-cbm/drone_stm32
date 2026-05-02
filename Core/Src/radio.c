@@ -117,15 +117,6 @@ static inline uint32_t diff_ticks(uint32_t t, uint32_t t0, uint32_t max_tick){
 
 
 
-/*ici on ecris le callback qui est directement appele par le timer. en effet a la differance du mpu
-*les donnes ne sont pas demander de manere periodique mais arrivent aleatoirement
-*
-*le callback doit :
-*   	- identifier de quel channel vient le front
-*   	- si il est montant ou descandant
-*   	- calculer la largeur du pulse
-*/
-
 
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
 
