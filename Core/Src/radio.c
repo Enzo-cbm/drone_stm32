@@ -97,7 +97,7 @@ void radioRtos_bind_task(TaskHandle_t taskToNotify){
 
 
 /*
- * pour mesurer la taille du front on utilise un timer de 16bit, il est regler pour que un bit corresponde a 1us
+ * pour mesurer la taille du front on utilise un timer de 16bit, il est regle pour que un bit corresponde a 1us
  * reglage dans cubeMX
  * toutes les 65535us : 0 -> 1 -> 2 -> ... -> 65534 -> 65535 -> 0 -> 1 -> ... chaque tick incremente de 1bit
  * il y a 65535 +1 valeurs possible
