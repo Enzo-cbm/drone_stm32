@@ -41,9 +41,9 @@ typedef struct {
 
 
 /*
- * d/dt (erreur) = d/dt (counsigne - mesure) = d/dt (w_consigne) - d/dt (gyro)
+ * d/dt (erreur) = d/dt (w_counsigne - mesure) = d/dt (w_consigne) - d/dt (gyro)
  *
- * si la consigne s eloigne d un coup de la mesure on creer un gros spike correctif
+ * si la consigne s eloigne d un coup de la mesure cela creer un gros spike correctif
  * entrainant un comportement nerveux voir des oscillation : derivative kick
  *
  *
@@ -54,11 +54,6 @@ typedef struct {
  * ce qui permet d amortire directement la vitesse angulaire
  *
  *
- * le giro donne w = d/dt teta c est donc deja une derivee pas besoin de diviser une seconde fois par dt
- *
- * de plus le gyro est plus rapide que  la derivee sur les angles car il n y
- *
- * de filtre mahony applique dessus
  *
  */
 
@@ -66,8 +61,6 @@ typedef struct {
 /*
  *
  * sur le PI_teta pas de terme derive : dt mise a part il reviendrait a doubler le terme derive
- *
- *
  *
  *
  */
